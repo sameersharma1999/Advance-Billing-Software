@@ -1,14 +1,13 @@
 -- phpMyAdmin SQL Dump
--- version 4.9.0.1
+-- version 5.0.2
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 31, 2019 at 08:14 AM
--- Server version: 10.3.16-MariaDB
--- PHP Version: 7.3.6
+-- Generation Time: May 13, 2020 at 03:03 PM
+-- Server version: 10.4.11-MariaDB
+-- PHP Version: 7.3.17
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-SET AUTOCOMMIT = 0;
 START TRANSACTION;
 SET time_zone = "+00:00";
 
@@ -41,17 +40,6 @@ CREATE TABLE `customers` (
   `phone_number` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
---
--- Dumping data for table `customers`
---
-
-INSERT INTO `customers` (`customer_id`, `first_name`, `last_name`, `address`, `state`, `city`, `gst_number`, `addhar_card_number`, `pan_number`, `phone_number`) VALUES
-(1, 'gursimar', 'kaur', 'sth', 'Punjab', 'ludhiana', '', '8575 2562 2452', 'JMXPS4639F', '9878717057'),
-(3, 'sameer', 'sharma', 'sfa', 'Punjab', 'ldh', '', '1234 5678 9101', '', '8837833685'),
-(4, 'anand ', 'kumar', 'DMC', 'Punjab', 'ludhiana', '', '9807 4321 1201', 'JMXPS4639F', '9876543210'),
-(5, 'alice', 'game', 'idk', 'Punjab', 'jaipur', '', '1234 6547 9999', '', '8837833621'),
-(6, 'sharukh', 'khan', 'idk', 'Maharashtra', 'mumbai', '', '9876 5432 1111', '', '9779478333');
-
 -- --------------------------------------------------------
 
 --
@@ -59,19 +47,12 @@ INSERT INTO `customers` (`customer_id`, `first_name`, `last_name`, `address`, `s
 --
 
 CREATE TABLE `items` (
-  `item_id` varchar(100) DEFAULT NULL,
+  `item_id` varchar(100) NOT NULL,
   `item_name` varchar(200) DEFAULT NULL,
   `price` varchar(50) DEFAULT NULL,
   `gst_per` varchar(50) NOT NULL,
   `hsn_code` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
---
--- Dumping data for table `items`
---
-
-INSERT INTO `items` (`item_id`, `item_name`, `price`, `gst_per`, `hsn_code`) VALUES
-('21', 'jeans', '500', '5', '');
 
 -- --------------------------------------------------------
 
@@ -81,15 +62,16 @@ INSERT INTO `items` (`item_id`, `item_name`, `price`, `gst_per`, `hsn_code`) VAL
 
 CREATE TABLE `passwords` (
   `hash` varchar(500) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,
-  `salt` varchar(100) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL
+  `salt` varchar(100) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,
+  `email` varchar(500) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
 -- Dumping data for table `passwords`
 --
 
-INSERT INTO `passwords` (`hash`, `salt`) VALUES
-('3c8e6aa9db2730c68facff3a9a943983438393b38a66663f833dbb40b6e59004a7d339e7122e19db3bee538dbdaec7115fcc070dbced961be94873bf263a8de4', '831e7eb6ff4e4ed98ecc254e0de8afda');
+INSERT INTO `passwords` (`hash`, `salt`, `email`) VALUES
+('a6537d1f58748265413dea4cf45c19793b82eb1b4e362bfc517c4bd0b521e1db64a98e5cc9f3990c3b2435657e1d398245ec02168271896436c37520777a137a', '1818f96e70a34d40a82f79495645ddd4', 'sameersharma8123@gmail.com');
 
 --
 -- Indexes for dumped tables
@@ -103,6 +85,12 @@ ALTER TABLE `customers`
   ADD UNIQUE KEY `phone_number` (`phone_number`);
 
 --
+-- Indexes for table `items`
+--
+ALTER TABLE `items`
+  ADD PRIMARY KEY (`item_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -110,7 +98,7 @@ ALTER TABLE `customers`
 -- AUTO_INCREMENT for table `customers`
 --
 ALTER TABLE `customers`
-  MODIFY `customer_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `customer_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
