@@ -12,13 +12,21 @@ class UploadRetrievePassword:  # here we upload and retrieve password (hash salt
         r_p = my_cursor.fetchone()
         return r_p
 
-    @classmethod  # here we retrieve email
+    @classmethod  # here we retrieve registered email
     def retrieve_email(cls):
         my_db = DBConnection.get_connection()
         my_cursor = my_db.cursor()
         my_cursor.execute("""SELECT * FROM passwords""")
         r_p = my_cursor.fetchone()
         return r_p[2]
+
+    @classmethod
+    def retrieve_ph_no(cls):  # retrieve registered phone number
+        my_db = DBConnection.get_connection()
+        my_cursor = my_db.cursor()
+        my_cursor.execute("""SELECT * FROM passwords""")
+        r_p = my_cursor.fetchone()
+        return r_p[3]
 
     @classmethod
     def update_password(cls, has, salt):  # update password (hash + salt)
@@ -74,6 +82,14 @@ class Customer:  # In class Customer we will handle all the customer's update, i
             return temp_dic
         my_db.commit()
 
+    @classmethod
+    def get_customers(cls):
+        my_db = DBConnection.get_connection()
+        my_cursor = my_db.cursor()
+        my_cursor.execute(""" SELECT * FROM customers order by first_name asc""")
+        result = my_cursor.fetchall()
+        return result
+
 
 class Items:  # In class Items we will handle all the items update, insert and search
     @classmethod
@@ -106,3 +122,38 @@ class Items:  # In class Items we will handle all the items update, insert and s
         my_cursor.execute(""" SELECT * FROM items WHERE item_id = '%s' """ % item_id)
         result = my_cursor.fetchone()
         return result
+
+    @classmethod
+    def get_items(cls):
+        my_db = DBConnection.get_connection()
+        my_cursor = my_db.cursor()
+        my_cursor.execute(""" SELECT * FROM items order by item_name asc""")
+        result = my_cursor.fetchall()
+        return result
+
+
+class Invoice:
+
+    @classmethod
+    def insert_invoice_data(cls, invoice_det):
+        my_db = DBConnection.get_connection()
+        my_cursor = my_db.cursor()
+        data = [invoice_det[0], invoice_det[1], invoice_det[2]]  # only date and grand total is saved
+        sql_formula = """ INSERT INTO invoice(date, total_without_gst, grand_total_with_gst) VALUES(%s, %s, %s)"""
+        my_cursor.execute(sql_formula, data)
+        my_db.commit()
+
+    @classmethod
+    def retrieve_invoice_data(cls):
+        my_db = DBConnection.get_connection()
+        my_cursor = my_db.cursor()
+        date = """SELECT date FROM invoice"""
+        my_cursor.execute(date)
+        date = my_cursor.fetchall()
+        total_without_gst = """SELECT total_without_gst FROM invoice"""
+        my_cursor.execute(total_without_gst)
+        total_without_gst = my_cursor.fetchall()
+        grand_total_with_gst = """SELECT grand_total_with_gst FROM invoice"""
+        my_cursor.execute(grand_total_with_gst)
+        grand_total_with_gst = my_cursor.fetchall()
+        return date, total_without_gst, grand_total_with_gst

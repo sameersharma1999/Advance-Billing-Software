@@ -1,3 +1,4 @@
+import os # for removing image file
 from PyQt5 import QtWidgets
 from App.PythonUi.password import Ui_pLoginWindow
 from App.PythonUi.forgot_password import Ui_fpMainWindow
@@ -10,13 +11,19 @@ from PyQt5.QtWidgets import QMessageBox
 from App.Database.db_changes import UploadRetrievePassword
 from App.Database.db_changes import Customer
 from App.Database.db_changes import Items
+from App.Database.db_changes import Invoice
 from random import randint
 from PyQt5.QtWidgets import *
 from mysql.connector.errors import IntegrityError
 import datetime
+from PyQt5.QtGui import QStandardItemModel, QTextCursor
+from PyQt5.QtCore import Qt
+import matplotlib.pyplot as plt
+from PyQt5 import QtGui  # for plotting graph on label
 
 
 class UserInteraction(QtWidgets.QMainWindow):
+    FROM, SUBJECT, DATE = range(3)
 
     def __init__(self, parent=None):
         super(UserInteraction, self).__init__(parent)
@@ -28,6 +35,11 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.item_id_to_edit = ...
         self.same_check_box = False
         self.date = datetime.date.today()
+        self.final_items_in_invoice = []
+        self.final_customer_transport_totalbill_details_in_invoice = []
+        # flag for invoice list to check whether the input of + button if after edit function or not
+        self.edit_check_flag_invoice_list = 0
+        self.dic_gst = {'cgst': 0, 'sgst': 0, 'igst': 0}
 
     def main_login_window_setup(self, screen):  # here we setup login window
         if screen == 'reset_window':  # hide password reset window
@@ -50,6 +62,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.fpUi = Ui_fpMainWindow()  # object of forgot password ui class (Ui_fpMainWindow()) (forgot_password.py file# )
         self.fpUi.setup_fp(self.fpMainWindow)
         self.fpMainWindow.show()
+        self.hover_effect('fpUi')
         self.fpUi.fpSaveButton.clicked.connect(self.get_new_password)
         self.fpUi.fpSaveButton.setEnabled(False)  # initially disabled
         self.fpUi.fpNpLineEdit.setEnabled(False)  # initially disabled
@@ -64,6 +77,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.mwUi = UiMwMainWindow()  # object of option/menu ui class (UiMwMainWindow()) (menu.py file# )
         self.mwUi.setup_main_window(self.mwMainWindow)
         self.mwMainWindow.show()
+        self.hover_effect('mwUi')
         self.mwUi.mwAddCustomelrLabel.mousePressEvent = self.add_customer_tab
         self.mwUi.mwAddItemLabel.mousePressEvent = self.add_item_tab
         self.mwUi.mwEditCustomerLabel.mousePressEvent = self.edit_customer_tab
@@ -78,30 +92,51 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.tabsMainWindow = QtWidgets.QMainWindow()
         self.tabs_ui = Ui_tabs_MainWindow()
         self.tabs_ui.setup_tabs_window(self.tabsMainWindow)
+        self.hover_effect('tabs_ui')
         self.tabsMainWindow.show()
-
         self.tabs_ui.tabs.setTabsClosable(True)
         self.tabs_ui.tabs.tabCloseRequested.connect(self.close_respective_tab)  # here we close the respective tab and remove its track
 
         """One of the tab below will be opened initially as per request from menu.py"""
         if tab_name == 'add_customer_tab':
             self.open_add_customer_tab('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'add_item_tab':
             self.open_add_item_tab('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'edit_customer_tab':
             self.open_edit_customer_tab('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'edit_item_tab':
             self.open_edit_item_tab('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'billing_tab':
             self.open_billing_tab('')
+            self.invoice_number()
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'graphs_tab':
             self.open_graphs_tab('')
+            self.retrieve_data_from_db()
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'view_all_customer_tab':
             self.open_view_customer_tab('')
+            self.all_customers('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'view_all_items_tab':
             self.open_view_items_tab('')
+            self.all_items('')
+            self.hover_effect('tabs_ui')
+
         elif tab_name == 'change_password_tab':
             self.open_change_password_tab('')
+            self.hover_effect('tabs_ui')
 
         """opening tabs from the labels in tabs window only"""
         self.tabs_ui.addCusIconLabel_2.mousePressEvent = self.open_add_customer_tab
@@ -160,6 +195,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         """
         Below is everything about the invoice tab
         """
+
         self.tabs_ui.mmInLineEdit1.returnPressed.connect(lambda: self.get_mobile_invoice(self.tabs_ui.mmInLineEdit1.text()))
         date = str(self.date).split('-')
         new_date = f'{date[2]}-{date[1]}-{date[0]}'
@@ -167,7 +203,512 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.same_customer_details_enabled_disabled(False)
         self.tabs_ui.mmInComboBox1.clicked.connect(lambda: self.check(self.tabs_ui.mmInLineEdit1.text()))
         self.tabs_ui.mmInLineEdit3.returnPressed.connect(lambda: self.another_shipper(self.tabs_ui.mmInLineEdit3.text()))
+        self.tabs_ui.mmInLineEdit4.returnPressed.connect(self.item_details_from_db)  # retrieving data from item db
+        self.tabs_ui.mmInLineEdit7.returnPressed.connect(self.calculating_total_price)
 
+        # setting transport details disabled before check box is set
+        self.tabs_ui.mmInLineEdit13.setEnabled(False)
+        self.tabs_ui.mmInLineEdit14.setEnabled(False)
+        self.tabs_ui.mmInLineEdit15.setEnabled(False)
+        self.tabs_ui.mmInComboBox2.clicked.connect(self.enable_transport_details)
+
+        # setting all auto updating items disabled for user
+        self.tabs_ui.mmInLineEdit6.setEnabled(False)
+        self.tabs_ui.mmInLineEdit8.setEnabled(False)
+        self.tabs_ui.mmInLineEdit9.setEnabled(False)
+        self.tabs_ui.mmInLineEdit10.setEnabled(False)
+        self.tabs_ui.mmInLineEdit11.setEnabled(False)
+        self.tabs_ui.mmInLineEdit12.setEnabled(False)
+        self.tabs_ui.mmInLineEdit16.setEnabled(False)
+        self.tabs_ui.mmInLineEdit17.setEnabled(False)
+        self.tabs_ui.mmInLineEdit18.setEnabled(False)
+        self.tabs_ui.mmInLineEdit19.setEnabled(False)
+        self.tabs_ui.mmInLineEdit20.setEnabled(False)
+
+        # click event
+        self.tabs_ui.mmInTableWidget.clicked.connect(self.edit_option_in_invoice)
+
+        # Add item in tree view
+        self.tabs_ui.mmInPushButton1.clicked.connect(self.add_item_in_invoice)
+
+        # remove item from tree view
+        self.tabs_ui.mmInPushButton2.clicked.connect(self.remove_item_from_invoice)
+
+        # generate button function binding
+        self.tabs_ui.mmInPushButton4.clicked.connect(self.generate_button_function)
+
+        # clearing file
+        self.tabs_ui.mmInPushButton3.clicked.connect(self.clearing_whole_invoice_tab)
+
+        """
+        Below is everything about the all item's tab
+        """
+        self.tabs_ui.mmIiLabel2.mousePressEvent = self.all_items
+
+        """
+        Below is everything about the all customer's tab
+        """
+        self.tabs_ui.mmCiLabel2.mousePressEvent = self.all_customers
+
+        """
+        Below is everything about the Graph's tab
+        """
+        self.tabs_ui.mmGPushButton.clicked.connect(self.save_graph)
+        self.tabs_ui.mmGPushButton.setShortcut("Ctrl+S")
+
+        # combo box link with function
+        # self.tabs_ui.mmGComboBox.activated[str].connect(self.graph_combo_box)
+
+    # below are gui hover and initial setting functions
+    def hover_effect(self, control):
+        # adding hover effect
+        if control == 'tabs_ui':
+            self.tabs_ui.mmInnerFrame.setStyleSheet("QPushButton:hover\n"
+                                                    "{\n"
+                                                    "    background-color: rgb(213, 213, 213);\n"
+                                                    "}")
+            self.tabs_ui.addCusIconLabel_2.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.editCusIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.invoiceIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.passwordIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.graphsIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.label.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.label_4.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.editItemIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+            self.tabs_ui.addItemIconLabel.setStyleSheet("QLabel:hover\n"
+                                                "{\n"
+                                                "    background-color: rgb(213, 213, 213);\n"
+                                                "}")
+
+        elif control == 'mwUi':
+            self.mwUi.mwInnerFrame.setStyleSheet("QLabel:hover\n"
+                                            "{\n"
+                                            "    background-color: rgb(213, 213, 213);\n"
+                                            "}")
+        else:
+            self.fpUi.fpInnerFrame.setStyleSheet("QPushButton:hover\n"
+                                            "{\n"
+                                            "    background-color: rgb(213, 213, 213);\n"
+                                            "}")
+
+    def enable_transport_details(self):
+        if self.tabs_ui.mmInComboBox2.isChecked():
+            # setting transport details enabled after check box is set
+            self.tabs_ui.mmInLineEdit13.setEnabled(True)
+            self.tabs_ui.mmInLineEdit14.setEnabled(True)
+            self.tabs_ui.mmInLineEdit15.setEnabled(True)
+        else:
+            # setting transport details disabled before check box is set
+            self.tabs_ui.mmInLineEdit13.setEnabled(False)
+            self.tabs_ui.mmInLineEdit14.setEnabled(False)
+            self.tabs_ui.mmInLineEdit15.setEnabled(False)
+
+    # below are all functions of invoice tab
+    def invoice_number(self):
+            self.invoice_file_object = open("../invoice_number.txt", "r")  # opening invoice file
+            self.tabs_ui.mmInLabe30.setText(str(int(self.invoice_file_object.readline())))
+            self.invoice_file_object.close()
+
+    def enter_values_in_database(self):
+        if self.tabs_ui.mmInLineEdit20.text() != '':
+            invoice_det = [str(self.date),  str(self.tabs_ui.mmInLineEdit16.text()), str(self.tabs_ui.mmInLineEdit20.text())]
+            Invoice.insert_invoice_data(invoice_det)
+            return True
+        else:
+            self.msg.setWindowTitle("Error")
+            self.msg.setText("No items are added in the bill.")
+            self.msg.setIcon(QMessageBox.Warning)
+            self.msg.exec_()
+            return False
+
+    def invoice_number_update(self):
+        invoice_file_object = open("../invoice_number.txt", "+w")
+        invoice_file_object.write(str(int(self.tabs_ui.mmInLabe30.text()) + 1))
+        invoice_file_object.close()
+
+    def setting_final_list_of_invoice_tab(self):
+        self.final_customer_transport_totalbill_details_in_invoice.append(
+            [self.tabs_ui.mmInLineEdit1.text(), self.tabs_ui.mmInLineEdit2.text(), self.tabs_ui.mmInLabe27.text()]
+        )  # storing customer basic info
+        self.final_customer_transport_totalbill_details_in_invoice.append(
+            [self.tabs_ui.mmInLineEdit3.text(), self.tabs_ui.mmInLabe28.text(), self.tabs_ui.mmInLabe29.text()]
+        )  # storing shipping address
+        self.final_customer_transport_totalbill_details_in_invoice.append(
+            [self.tabs_ui.mmInLineEdit13.text(), self.tabs_ui.mmInLineEdit14.text(), self.tabs_ui.mmInLineEdit15.text()]
+        )  # transportation details
+        self.final_customer_transport_totalbill_details_in_invoice.append(
+            [self.tabs_ui.mmInLineEdit16.text(), self.tabs_ui.mmInLineEdit17.text(), self.tabs_ui.mmInLineEdit18.text(),
+             self.tabs_ui.mmInLineEdit19.text(), self.tabs_ui.mmInLineEdit20.text()]
+        )
+
+    def generate_button_function(self):
+
+        if self.tabs_ui.mmInLineEdit1.text() != '' and self.tabs_ui.mmInLineEdit2.text() != '':
+            if self.enter_values_in_database():
+                self.msg.setWindowTitle("Information")
+                self.msg.setText("Data Saved")
+                self.msg.setIcon(QMessageBox.Information)
+                self.msg.exec_()
+                # creating final list of customer, transport and grandtotal details
+                self.setting_final_list_of_invoice_tab()
+                self.invoice_number_update()  # updating invoice number
+                self.clearing_whole_invoice_tab()  # clearing values of invoice tab
+
+    def clearing_whole_invoice_tab(self):
+        # clearing line edit data
+        self.tabs_ui.mmInLineEdit1.clear()
+        self.tabs_ui.mmInLineEdit2.clear()
+        self.tabs_ui.mmInLineEdit3.clear()
+        self.tabs_ui.mmInLineEdit4.clear()
+        self.tabs_ui.mmInLineEdit5.clear()
+        self.tabs_ui.mmInLineEdit6.clear()
+        self.tabs_ui.mmInLineEdit7.clear()
+        self.tabs_ui.mmInLineEdit8.clear()
+        self.tabs_ui.mmInLineEdit9.clear()
+        self.tabs_ui.mmInLineEdit10.clear()
+        self.tabs_ui.mmInLineEdit11.clear()
+        self.tabs_ui.mmInLineEdit12.clear()
+        self.tabs_ui.mmInLineEdit13.clear()
+        self.tabs_ui.mmInLineEdit14.clear()
+        self.tabs_ui.mmInLineEdit15.clear()
+        self.tabs_ui.mmInLineEdit16.clear()
+        self.tabs_ui.mmInLineEdit17.clear()
+        self.tabs_ui.mmInLineEdit18.clear()
+        self.tabs_ui.mmInLineEdit19.clear()
+        self.tabs_ui.mmInLineEdit20.clear()
+        # clearing label data
+        self.tabs_ui.mmInLabe27.clear()
+        self.tabs_ui.mmInLabe28.clear()
+        self.tabs_ui.mmInLabe29.clear()
+        # clearing final list of invoice data
+        self.final_items_in_invoice = []
+        # clearing final list of customer, transport and total bill details
+        self.final_customer_transport_totalbill_details_in_invoice = []
+        # clearing tree view
+        self.display_in_tree_view()
+        # disabling combo boxes
+        if self.tabs_ui.mmInComboBox1.isChecked():
+            self.tabs_ui.mmInComboBox1.nextCheckState()
+        if self.tabs_ui.mmInComboBox2.isChecked():
+            self.tabs_ui.mmInComboBox2.nextCheckState()
+        # updating invoice number
+        self.invoice_number()
+
+    def calculating_total_price(self):
+        if self.tabs_ui.mmInLineEdit7.text() and self.tabs_ui.mmInLineEdit5 is not None:
+            price = int(self.tabs_ui.mmInLineEdit5.text()) * int(self.tabs_ui.mmInLineEdit6.text())
+            discount_price = price - (price*int(self.tabs_ui.mmInLineEdit7.text())/100)
+            try:
+                if float(self.tabs_ui.mmInLineEdit8.text()) == 0.0 and float(self.tabs_ui.mmInLineEdit9.text()) == 0.0:
+                    self.dic_gst['igst'] = (discount_price * float(self.tabs_ui.mmInLineEdit10.text()))/100
+                    self.tabs_ui.mmInLineEdit11.setText(str(discount_price))
+
+                else:
+                    self.dic_gst['cgst'] = (discount_price * (float(self.tabs_ui.mmInLineEdit8.text())))/100
+                    self.dic_gst['sgst'] = (discount_price * (float(self.tabs_ui.mmInLineEdit9.text())))/100
+                    self.tabs_ui.mmInLineEdit11.setText(str(discount_price))
+            except Exception as e:
+                print(e)
+
+    def item_details_from_db(self):
+        result = Items.search_item(self.tabs_ui.mmInLineEdit4.text())
+        if result is not None:
+            self.tabs_ui.mmInLineEdit6.setText(result[2])
+            if self.tabs_ui.mmInLineEdit2.text() == 'Punjab':
+                try:
+                    self.tabs_ui.mmInLineEdit8.setText(str(int(result[3])/2))
+                    self.tabs_ui.mmInLineEdit9.setText(str(int(result[3])/2))
+                    self.tabs_ui.mmInLineEdit10.setText('0')
+                except Exception as e:
+                    print(e)
+            else:
+                self.tabs_ui.mmInLineEdit8.setText('0')
+                self.tabs_ui.mmInLineEdit9.setText('0')
+                self.tabs_ui.mmInLineEdit10.setText(result[3])
+            self.tabs_ui.mmInLineEdit12.setText(result[1])
+        else:
+            # message to user that item doesn't exist
+            self.msg.setWindowTitle("Error")
+            self.msg.setText("Item code doesn't exist in database. Try with some other value of item code")
+            self.msg.setIcon(QMessageBox.Warning)
+            self.msg.exec_()
+
+    def calculating_index_at_selection(self):  # returns selected index value of item code
+        # returns value of 0 index of selected row
+        return self.tabs_ui.mmInTableWidget.model().data(self.tabs_ui.mmInTableWidget.model().
+                                                         index(self.tabs_ui.mmInTableWidget.currentIndex().row(), 0))
+
+    def edit_option_in_invoice(self):
+        try:
+            for i in range(len(self.final_items_in_invoice)):
+                if self.final_items_in_invoice[i][0] == self.calculating_index_at_selection():
+                    self.tabs_ui.mmInLineEdit4.setText(self.final_items_in_invoice[i][0])
+                    self.tabs_ui.mmInLineEdit5.setText(self.final_items_in_invoice[i][1])
+                    self.tabs_ui.mmInLineEdit6.setText(self.final_items_in_invoice[i][2])
+                    self.tabs_ui.mmInLineEdit7.setText(self.final_items_in_invoice[i][3])
+                    self.tabs_ui.mmInLineEdit8.setText(self.final_items_in_invoice[i][4])
+                    self.tabs_ui.mmInLineEdit9.setText(self.final_items_in_invoice[i][5])
+                    self.tabs_ui.mmInLineEdit10.setText(self.final_items_in_invoice[i][6])
+                    self.tabs_ui.mmInLineEdit11.setText(self.final_items_in_invoice[i][7])
+                    self.tabs_ui.mmInLineEdit12.setText(self.final_items_in_invoice[i][8])
+                    # flag for invoice list to check whether the input of + button if after edit function or not
+                    self.calculating_total_price()  # to remove correct values from total bill
+                    self.edit_check_flag_invoice_list = 1
+                    break
+        except Exception as e:
+            print(e)
+
+    def append_final_items_in_invoice(self):
+        self.final_items_in_invoice.append([self.tabs_ui.mmInLineEdit4.text(), self.tabs_ui.mmInLineEdit5.text(),
+                                            self.tabs_ui.mmInLineEdit6.text(), self.tabs_ui.mmInLineEdit7.text(),
+                                            self.tabs_ui.mmInLineEdit8.text(), self.tabs_ui.mmInLineEdit9.text(),
+                                            self.tabs_ui.mmInLineEdit10.text(), self.tabs_ui.mmInLineEdit11.text(),
+                                            self.tabs_ui.mmInLineEdit12.text()])
+
+    def setting_final_price(self, control, item_code):
+        for i in range(len(self.final_items_in_invoice)):
+            if self.final_items_in_invoice[i][0] == item_code:
+                if control == 'add':
+                    try:
+                        # setting total price
+                        if self.tabs_ui.mmInLineEdit16.text() != '':
+                            self.tabs_ui.mmInLineEdit16.setText(str(float(self.tabs_ui.mmInLineEdit16.text()) + float(self.final_items_in_invoice[i][7])))
+                        if self.tabs_ui.mmInLineEdit16.text() == '':
+                            self.tabs_ui.mmInLineEdit16.setText(str(float(self.final_items_in_invoice[i][7])))
+                        if self.tabs_ui.mmInLineEdit17.text() != '':
+                            self.tabs_ui.mmInLineEdit17.setText(
+                                str(float(self.tabs_ui.mmInLineEdit17.text()) + float(self.dic_gst['sgst'])))
+                        if self.tabs_ui.mmInLineEdit17.text() == '':
+                            self.tabs_ui.mmInLineEdit17.setText(str(float(self.dic_gst['sgst'])))
+                        if self.tabs_ui.mmInLineEdit18.text() != '':
+                            self.tabs_ui.mmInLineEdit18.setText(
+                                str(float(self.tabs_ui.mmInLineEdit18.text()) + float(self.dic_gst['cgst'])))
+                        if self.tabs_ui.mmInLineEdit18.text() == '':
+                            self.tabs_ui.mmInLineEdit18.setText(str(float(self.dic_gst['cgst'])))
+                        if self.tabs_ui.mmInLineEdit19.text() != '':
+                            self.tabs_ui.mmInLineEdit19.setText(
+                                str(float(self.tabs_ui.mmInLineEdit19.text()) + float(self.dic_gst['igst'])))
+                        if self.tabs_ui.mmInLineEdit19.text() == '':
+                            self.tabs_ui.mmInLineEdit19.setText(str(float(self.dic_gst['igst'])))
+                    except Exception as e:
+                        print(e)
+                if control == 'remove':
+                    if self.tabs_ui.mmInLineEdit16.text() != '':
+                        self.tabs_ui.mmInLineEdit16.setText(str(float(self.tabs_ui.mmInLineEdit16.text()) - float(self.final_items_in_invoice[i][7])))
+                    if self.tabs_ui.mmInLineEdit17.text() != '':
+                        self.tabs_ui.mmInLineEdit17.setText(
+                            str(float(self.tabs_ui.mmInLineEdit17.text()) - float(self.dic_gst['sgst'])))
+                    if self.tabs_ui.mmInLineEdit18.text() != '':
+                        self.tabs_ui.mmInLineEdit18.setText(
+                            str(float(self.tabs_ui.mmInLineEdit18.text()) - float(self.dic_gst['cgst'])))
+                    if self.tabs_ui.mmInLineEdit19.text() != '':
+                        self.tabs_ui.mmInLineEdit19.setText(
+                            str(float(self.tabs_ui.mmInLineEdit19.text()) - float(self.dic_gst['igst'])))
+                # setting grand total based on values above it
+                try:
+                    if (self.tabs_ui.mmInLineEdit16.text(), self.tabs_ui.mmInLineEdit17.text(),
+                            self.tabs_ui.mmInLineEdit18.text(), self.tabs_ui.mmInLineEdit19.text()) != ('', '', '', ''):
+                        self.tabs_ui.mmInLineEdit20.setText(str(float(self.tabs_ui.mmInLineEdit16.text()) +
+                                                            float(self.tabs_ui.mmInLineEdit17.text()) +
+                                                            float(self.tabs_ui.mmInLineEdit18.text()) +
+                                                            float(self.tabs_ui.mmInLineEdit19.text())))
+                except Exception as e:
+                    print(e)
+
+    def add_item_in_invoice(self):  # function to add item in tree view (invoice tab)
+        # to verify customer details are filed properly as gst depend on state
+        if self.tabs_ui.mmInLineEdit1.text() != '':
+            if self.tabs_ui.mmInLineEdit2.text() == '':
+                self.get_mobile_invoice(self.tabs_ui.mmInLineEdit1.text())
+            # check all the values in line edit
+            if self.tabs_ui.mmInLineEdit4.text() != '' and self.tabs_ui.mmInLineEdit5.text() != '' and self.tabs_ui.mmInLineEdit7.text() != '':
+                self.item_details_from_db()  # to verify last time update in item code before pressing enter
+                self.calculating_total_price()  # to verify last time update in discount or quantity before adding
+                if len(self.final_items_in_invoice) >= 1:
+                    if self.tabs_ui.mmInLineEdit4.text() not in \
+                            [self.final_items_in_invoice[i][0] for i in range(len(self.final_items_in_invoice))]:
+                        self.append_final_items_in_invoice()
+                        self.setting_final_price('add', self.tabs_ui.mmInLineEdit4.text())  # used to add the values in invoice total price
+                        self.clearing_line_edit_item_invoice()
+
+                    else:  # if item gets matched with already existing item id of the list
+                        if self.edit_check_flag_invoice_list == 1:
+                            self.remove_item_from_invoice()  # removing selected item with previous values
+                            self.append_final_items_in_invoice()  # updating with new values to previous item code only
+                            self.setting_final_price('add', self.tabs_ui.mmInLineEdit4.text())  # used to add the values in invoice total price
+                            self.clearing_line_edit_item_invoice()
+                        # warning for same item added in the list
+                        if self.edit_check_flag_invoice_list == 0:
+                            self.msg.setWindowTitle("Error")
+                            self.msg.setText('Already present in the invoice list.')
+                            self.msg.setIcon(QMessageBox.Warning)
+                            self.msg.exec_()
+
+                else:
+                    self.append_final_items_in_invoice()
+                    self.setting_final_price('add', self.tabs_ui.mmInLineEdit4.text())  # used to add the values in invoice total price
+                    self.clearing_line_edit_item_invoice()
+                # add it in tree view
+                self.display_in_tree_view()
+        else:
+            self.msg.setWindowTitle("Error")
+            self.msg.setText("Enter phone number to add items in bill.")
+            self.msg.setIcon(QMessageBox.Warning)
+            self.msg.exec_()
+
+    def clearing_line_edit_item_invoice(self):
+        self.tabs_ui.mmInLineEdit4.clear()
+        self.tabs_ui.mmInLineEdit5.clear()
+        self.tabs_ui.mmInLineEdit6.clear()
+        self.tabs_ui.mmInLineEdit7.clear()
+        self.tabs_ui.mmInLineEdit8.clear()
+        self.tabs_ui.mmInLineEdit9.clear()
+        self.tabs_ui.mmInLineEdit10.clear()
+        self.tabs_ui.mmInLineEdit11.clear()
+        self.tabs_ui.mmInLineEdit12.clear()
+
+    def display_in_tree_view(self):
+        model = self.create_tree_model(self)
+        self.tabs_ui.mmInTableWidget.setModel(model)
+        for i in range(len(self.final_items_in_invoice)):
+            self.add_tree(model, self.final_items_in_invoice[i][0], self.final_items_in_invoice[i][1],
+                         self.final_items_in_invoice[i][2], self.final_items_in_invoice[i][3],
+                         self.final_items_in_invoice[i][4], self.final_items_in_invoice[i][5],
+                         self.final_items_in_invoice[i][6], self.final_items_in_invoice[i][7],
+                         self.final_items_in_invoice[i][8])
+
+    def create_tree_model(self, parent):
+        model = QStandardItemModel(0, 9, parent)
+        model.setHeaderData(0, Qt.Horizontal, "Item Code")
+        model.setHeaderData(1, Qt.Horizontal, "Quantity")
+        model.setHeaderData(2, Qt.Horizontal, "Unit Price")
+        model.setHeaderData(3, Qt.Horizontal, "Discount %")
+        model.setHeaderData(4, Qt.Horizontal, "SGST")
+        model.setHeaderData(5, Qt.Horizontal, "CGST")
+        model.setHeaderData(6, Qt.Horizontal, "IGST")
+        model.setHeaderData(7, Qt.Horizontal, "Total Price")
+        model.setHeaderData(8, Qt.Horizontal, "Product Name")
+        return model
+
+    def add_tree(self, model, item_code, quantity, unit_price, discount, sgst, cgst, igst, total_price, product_name):
+        model.insertRow(0)
+        model.setData(model.index(0, 0), item_code)
+        model.setData(model.index(0, 1), quantity)
+        model.setData(model.index(0, 2), unit_price)
+        model.setData(model.index(0, 3), discount)
+        model.setData(model.index(0, 4), sgst)
+        model.setData(model.index(0, 5), cgst)
+        model.setData(model.index(0, 6), igst)
+        model.setData(model.index(0, 7), total_price)
+        model.setData(model.index(0, 8), product_name)
+
+    def remove_item_from_invoice(self):  # function to remove item from tree view (invoice tab)
+
+        self.setting_final_price('remove', self.tabs_ui.mmInLineEdit4.text())  # used to subtract the values in invoice total price
+        try:
+
+            for i in range(len(self.final_items_in_invoice)):
+                if self.final_items_in_invoice[i][0] == self.calculating_index_at_selection():
+                    t = self.final_items_in_invoice.pop(i)
+                    self.display_in_tree_view()
+                    break
+        except Exception as e:
+            print(e)
+
+    # below are all functions related to customer db tab
+    def all_customers(self, event):  # displaying all customers present in customer database
+        result = Customer.get_customers()
+        self.tabs_ui.mmCitableWidget.setRowCount(0)
+        for row_number, row_data in enumerate(result):
+            self.tabs_ui.mmCitableWidget.setRowCount(row_number+1)
+            for column_number, data in enumerate(row_data):
+                self.tabs_ui.mmCitableWidget.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
+
+    # below are all functions related to item db tab
+    def all_items(self, event):  # display all the items present in items database
+        result = Items.get_items()
+        self.tabs_ui.mmIitableWidget.setRowCount(0)
+        for row_number, row_data in enumerate(result):
+            self.tabs_ui.mmIitableWidget.setRowCount(row_number+1)
+            for column_number, data in enumerate(row_data):
+                self.tabs_ui.mmIitableWidget.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
+
+    # below are function for graph tab
+
+    def retrieve_data_from_db(self):
+        self.date_data, self.total_without_gst, self.grand_total_with_gst = Invoice.retrieve_invoice_data()
+        # plotting values
+        self.plot_graph(0)
+
+    def plot_graph(self, control):
+        x = []
+        for i in self.date_data:
+            x.append(i[0])
+        self.date_data = x
+        y = []
+        for i in self.total_without_gst:
+            y.append(float(i[0]))
+        self.total_without_gst = y
+        plt.subplot(2, 1, 1)
+        plt.plot(x, y, 'o-')
+        plt.gcf().autofmt_xdate()
+        plt.title('Graph Representation of Sale')
+        plt.ylabel('Total with GST')
+        y = []
+        for i in self.grand_total_with_gst:
+            y.append(float(i[0]))
+        self.grand_total_with_gst = y
+        plt.subplot(2, 1, 2)
+        plt.plot(x, y, '.-')
+        plt.gcf().autofmt_xdate()
+        plt.xlabel('Date')
+        plt.ylabel('Total with GST')
+        if control == 0:
+            plt.savefig('graph.png', dpi=(130))
+            self.tabs_ui.mmGLabel1.setPixmap(QtGui.QPixmap("graph.png"))
+            self.tabs_ui.mmGLabel1.setScaledContents(True)
+            plt.close()
+            # deleting file
+            os.remove("graph.png")
+        else:
+            file_name = self.saveFileDialog()
+            plt.savefig(file_name, dpi=(130))
+            plt.close()
+
+    def saveFileDialog(self):
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Graph", "",
+                                                            "All Files (*);;Image Files (*.png *.jpg *.bmp)", options=options)
+        return file_name
+
+    def save_graph(self):
+        self.plot_graph(1)  # to save file
+
+    # other functions by Sameer
     def another_shipper(self, mob_no):
         try:
             mob_no = mob_no.strip().lower()
@@ -278,7 +819,7 @@ class UserInteraction(QtWidgets.QMainWindow):
                     price = int(price)
                 except ValueError:
                     self.msg.setWindowTitle("Error")
-                    self.msg.setText('Please enter the valid price')
+                    self.msg.setText('Please enter the valid price.')
                     self.msg.setIcon(QMessageBox.Warning)
                     self.msg.exec_()
                     return -1
@@ -287,7 +828,7 @@ class UserInteraction(QtWidgets.QMainWindow):
                 try:
                     Items.update_item(data, self.item_id_to_edit)
                     self.msg.setWindowTitle("Data updated")
-                    self.msg.setText('Item updated successfully')
+                    self.msg.setText('Item updated successfully.')
                     self.msg.setIcon(QMessageBox.Information)
                     self.msg.exec_()
                 except IntegrityError:  # if item id is already saved
@@ -298,12 +839,12 @@ class UserInteraction(QtWidgets.QMainWindow):
                     self.msg.exec_()
             else:
                 self.msg.setWindowTitle("Price")
-                self.msg.setText('Price is mandatory')
+                self.msg.setText('Price is mandatory.')
                 self.msg.setIcon(QMessageBox.Warning)
                 self.msg.exec_()
         else:
             self.msg.setWindowTitle("Item")
-            self.msg.setText('Item id is mandatory')
+            self.msg.setText('Item id is mandatory.')
             self.msg.setIcon(QMessageBox.Warning)
             self.msg.exec_()
 
@@ -330,7 +871,7 @@ class UserInteraction(QtWidgets.QMainWindow):
                     price = int(price)
                 except ValueError:
                     self.msg.setWindowTitle("Error")
-                    self.msg.setText('Please enter the valid price')
+                    self.msg.setText('Please enter the valid price.')
                     self.msg.setIcon(QMessageBox.Warning)
                     self.msg.exec_()
                     return -1
@@ -338,12 +879,13 @@ class UserInteraction(QtWidgets.QMainWindow):
                 try:
                     Items.insert_item([item_id, item_name, price, gst, hsn_code])
                     self.msg.setWindowTitle("Data saved")
-                    self.msg.setText('Item saved successfully')
+                    self.msg.setText('Item saved successfully.')
                     self.msg.setIcon(QMessageBox.Information)
                     self.msg.exec_()
                 except IntegrityError:  # if item id is already saved
                     self.msg.setWindowTitle("Error")
-                    self.msg.setText('This item id is already saved, if u want to update something then go to edit item id tab.')
+                    self.msg.setText(
+                        'This item id is already saved, if u want to update something then go to edit item id tab.')
                     self.msg.setIcon(QMessageBox.Warning)
                     self.msg.exec_()
             else:
@@ -378,7 +920,8 @@ class UserInteraction(QtWidgets.QMainWindow):
         if mobile_no != '':
             if gst_no == '' and addhar_no == '' and pan_no == '':
                 self.msg.setWindowTitle("Error")
-                self.msg.setText("One of the following is mandatory\n1. GST number\n2. PAN number\n3. AddharCard number")
+                self.msg.setText(
+                    "One of the following is mandatory:\n1. GST number\n2. PAN number\n3. AddharCard number")
                 self.msg.setIcon(QMessageBox.Warning)
                 self.msg.exec_()
             else:
@@ -610,24 +1153,30 @@ class UserInteraction(QtWidgets.QMainWindow):
             self.tabs_ui.tabs.addTab(self.tabs_ui.invoice, self.tabs_ui.icon6, "Invoice")
             self.track_tabs.append('Invoice')
             self.tabs_ui.tabs.setCurrentIndex(len(self.track_tabs) - 1)
+        self.invoice_number()
 
     def open_graphs_tab(self, event):
         if "Graphs" not in self.track_tabs:
             self.tabs_ui.tabs.addTab(self.tabs_ui.graphs, self.tabs_ui.icon7, "Graphs")
             self.track_tabs.append('Graphs')
             self.tabs_ui.tabs.setCurrentIndex(len(self.track_tabs) - 1)
+            self.retrieve_data_from_db()
 
     def open_view_customer_tab(self, event):
         if "All customer's" not in self.track_tabs:
             self.tabs_ui.tabs.addTab(self.tabs_ui.ShowAllCustomers, self.tabs_ui.icon8, "All customer's")
             self.track_tabs.append("All customer's")
             self.tabs_ui.tabs.setCurrentIndex(len(self.track_tabs) - 1)
+            # displaying contents of database
+            self.all_customers('')
 
     def open_view_items_tab(self, event):
         if "All item's" not in self.track_tabs:
             self.tabs_ui.tabs.addTab(self.tabs_ui.ShowAllItems, self.tabs_ui.icon9, "All item's")
             self.track_tabs.append("All item's")
             self.tabs_ui.tabs.setCurrentIndex(len(self.track_tabs) - 1)
+            # displaying contents of database
+            self.all_items('')
 
     def open_change_password_tab(self, event):
         if "Change password" not in self.track_tabs:
@@ -768,3 +1317,4 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication([])
     UserInteraction()
     app.exec_()
+

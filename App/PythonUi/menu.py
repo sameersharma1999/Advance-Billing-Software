@@ -19,6 +19,7 @@ class UiMwMainWindow(object):
         self.gridLayout = QtWidgets.QGridLayout(self.mwOuterFrame)
         self.gridLayout.setObjectName("gridLayout")
         self.mwInnerFrame = QtWidgets.QFrame(self.mwOuterFrame)
+
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)

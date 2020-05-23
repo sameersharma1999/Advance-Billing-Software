@@ -21,6 +21,7 @@ class Ui_fpMainWindow(object):
         self.gridLayout_3 = QtWidgets.QGridLayout(self.fpOuterFrame)
         self.gridLayout_3.setObjectName("gridLayout_3")
         self.fpInnerFrame = QtWidgets.QFrame(self.fpOuterFrame)
+
         self.fpInnerFrame.setMinimumSize(QtCore.QSize(0, 0))
         self.fpInnerFrame.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.fpInnerFrame.setFrameShape(QtWidgets.QFrame.StyledPanel)
