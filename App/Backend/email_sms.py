@@ -5,6 +5,20 @@ import requests
 import socket
 
 
+class SMS:
+    def __init__(self, sms):
+        self.sms = f'OTP: {sms}'
+        self.phone_numbers = UploadRetrievePassword.retrieve_ph_no()
+
+    def send_sms(self):
+        api_key = 'IXjnZCuSsB9UOtaD0b2wP1xR3VNkq6vd4HGyLfQzWTFm85cMlp3ikshcfUVt0BzYxbWe1rESMlpyTFIv'
+        url = "https://www.fast2sms.com/dev/bulk"  # url of api or site
+        payload = f"sender_id=FSTSMS&message={self.sms}&language=english&route=p&numbers={self.phone_numbers}"
+        headers = {'authorization': api_key, 'Content-Type': "application/x-www-form-urlencoded",
+                   'Cache-Control': "no-cache"}
+        requests.request("POST", url, data=payload, headers=headers)  # here we get response
+
+
 class Mail:
     @classmethod
     def check_internet_connection(cls):
@@ -19,7 +33,6 @@ class Mail:
         try:
             sender_email = 'thisisbradpitt1999@gmail.com'
             password = 'brad@gmail'
-
             receiver_email = UploadRetrievePassword.retrieve_email()
             message = EmailMessage()
             message['Subject'] = 'One time password'

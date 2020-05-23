@@ -1,17 +1,14 @@
-import os # for removing image file
+import os  # for removing image file
 from PyQt5 import QtWidgets
 from App.PythonUi.password import Ui_pLoginWindow
 from App.PythonUi.forgot_password import Ui_fpMainWindow
 from App.PythonUi.menu import UiMwMainWindow
 from App.PythonUi.tabs import Ui_tabs_MainWindow
 from App.Backend.hash_password import Passwords
-from App.Backend.emails import Mail
+from App.Backend.email_sms import Mail, SMS
 from App.Backend.patterns_validations import PatternsValidations
 from PyQt5.QtWidgets import QMessageBox
-from App.Database.db_changes import UploadRetrievePassword
-from App.Database.db_changes import Customer
-from App.Database.db_changes import Items
-from App.Database.db_changes import Invoice
+from App.Database.db_changes import UploadRetrievePassword, Customer, Items, Invoice
 from random import randint
 from PyQt5.QtWidgets import *
 from mysql.connector.errors import IntegrityError
@@ -366,7 +363,6 @@ class UserInteraction(QtWidgets.QMainWindow):
         )
 
     def generate_button_function(self):
-
         if self.tabs_ui.mmInLineEdit1.text() != '' and self.tabs_ui.mmInLineEdit2.text() != '':
             if self.enter_values_in_database():
                 self.msg.setWindowTitle("Information")
@@ -1242,7 +1238,7 @@ class UserInteraction(QtWidgets.QMainWindow):
     def reset_password(self, event):
         if Mail.check_internet_connection():  # if internet is connected
             self.msg.setWindowTitle("Email")
-            self.msg.setText('OTP Send to registered email')
+            self.msg.setText('OTP Send to registered email and phone number')
             self.msg.setIcon(QMessageBox.Information)
             self.msg.exec_()
 
@@ -1269,6 +1265,10 @@ class UserInteraction(QtWidgets.QMainWindow):
                 self.msg.setText('Unable to send email, please try again.')
                 self.msg.setIcon(QMessageBox.Warning)
                 self.msg.exec_()
+            try:
+                SMS(sms=str(otp)).send_sms()  # sms send to mobile number
+            except Exception as e:
+                print(e)
         else:  # if no internet connection
             self.msg.setWindowTitle("No Internet")
             self.msg.setText('Please connect to internet to reset password')
