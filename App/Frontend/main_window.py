@@ -349,10 +349,14 @@ class UserInteraction(QtWidgets.QMainWindow):
 
     def setting_final_list_of_invoice_tab(self):
         self.final_customer_transport_totalbill_details_in_invoice.append(
-            [self.tabs_ui.mmInLineEdit1.text(), self.tabs_ui.mmInLineEdit2.text(), self.tabs_ui.mmInLabe27.text()]
+            Customer.search_customer(self.tabs_ui.mmInLineEdit1.text())
         )  # storing customer basic info
-        self.final_customer_transport_totalbill_details_in_invoice.append(
-            [self.tabs_ui.mmInLineEdit3.text(), self.tabs_ui.mmInLabe28.text(), self.tabs_ui.mmInLabe29.text()]
+        if self.tabs_ui.mmInLineEdit3.text() != "":
+            self.final_customer_transport_totalbill_details_in_invoice.append(
+                Customer.search_customer(self.tabs_ui.mmInLineEdit3.text()))
+        else:
+            self.final_customer_transport_totalbill_details_in_invoice.append(
+                Customer.search_customer(self.tabs_ui.mmInLineEdit1.text())
         )  # storing shipping address
         self.final_customer_transport_totalbill_details_in_invoice.append(
             [self.tabs_ui.mmInLineEdit13.text(), self.tabs_ui.mmInLineEdit14.text(), self.tabs_ui.mmInLineEdit15.text()]
@@ -361,9 +365,13 @@ class UserInteraction(QtWidgets.QMainWindow):
             [self.tabs_ui.mmInLineEdit16.text(), self.tabs_ui.mmInLineEdit17.text(), self.tabs_ui.mmInLineEdit18.text(),
              self.tabs_ui.mmInLineEdit19.text(), self.tabs_ui.mmInLineEdit20.text()]
         )
+        print(self.final_customer_transport_totalbill_details_in_invoice)
 
     def generate_button_function(self):
-        if self.tabs_ui.mmInLineEdit1.text() != '' and self.tabs_ui.mmInLineEdit2.text() != '':
+        # to verify customer details are filed properly as gst depend on state
+        if self.tabs_ui.mmInLineEdit1.text() != '':
+            if self.tabs_ui.mmInLineEdit2.text() == '':
+                self.get_mobile_invoice(self.tabs_ui.mmInLineEdit1.text())
             if self.enter_values_in_database():
                 self.msg.setWindowTitle("Information")
                 self.msg.setText("Data Saved")
@@ -373,6 +381,11 @@ class UserInteraction(QtWidgets.QMainWindow):
                 self.setting_final_list_of_invoice_tab()
                 self.invoice_number_update()  # updating invoice number
                 self.clearing_whole_invoice_tab()  # clearing values of invoice tab
+        else:
+            self.msg.setWindowTitle("Error")
+            self.msg.setText("Enter phone number and items to generate the bill.")
+            self.msg.setIcon(QMessageBox.Warning)
+            self.msg.exec_()
 
     def clearing_whole_invoice_tab(self):
         # clearing line edit data
@@ -600,27 +613,28 @@ class UserInteraction(QtWidgets.QMainWindow):
     def create_tree_model(self, parent):
         model = QStandardItemModel(0, 9, parent)
         model.setHeaderData(0, Qt.Horizontal, "Item Code")
-        model.setHeaderData(1, Qt.Horizontal, "Quantity")
-        model.setHeaderData(2, Qt.Horizontal, "Unit Price")
-        model.setHeaderData(3, Qt.Horizontal, "Discount %")
-        model.setHeaderData(4, Qt.Horizontal, "SGST")
-        model.setHeaderData(5, Qt.Horizontal, "CGST")
-        model.setHeaderData(6, Qt.Horizontal, "IGST")
-        model.setHeaderData(7, Qt.Horizontal, "Total Price")
-        model.setHeaderData(8, Qt.Horizontal, "Product Name")
+        model.setHeaderData(1, Qt.Horizontal, "Product Name")
+        model.setHeaderData(2, Qt.Horizontal, "Quantity")
+        model.setHeaderData(3, Qt.Horizontal, "Unit Price")
+        model.setHeaderData(4, Qt.Horizontal, "Discount %")
+        model.setHeaderData(5, Qt.Horizontal, "SGST %")
+        model.setHeaderData(6, Qt.Horizontal, "CGST %")
+        model.setHeaderData(7, Qt.Horizontal, "IGST %")
+        model.setHeaderData(8, Qt.Horizontal, "Total Price")
+
         return model
 
     def add_tree(self, model, item_code, quantity, unit_price, discount, sgst, cgst, igst, total_price, product_name):
         model.insertRow(0)
         model.setData(model.index(0, 0), item_code)
-        model.setData(model.index(0, 1), quantity)
-        model.setData(model.index(0, 2), unit_price)
-        model.setData(model.index(0, 3), discount)
-        model.setData(model.index(0, 4), sgst)
-        model.setData(model.index(0, 5), cgst)
-        model.setData(model.index(0, 6), igst)
-        model.setData(model.index(0, 7), total_price)
-        model.setData(model.index(0, 8), product_name)
+        model.setData(model.index(0, 1), product_name)
+        model.setData(model.index(0, 2), quantity)
+        model.setData(model.index(0, 3), unit_price)
+        model.setData(model.index(0, 4), discount)
+        model.setData(model.index(0, 5), sgst)
+        model.setData(model.index(0, 6), cgst)
+        model.setData(model.index(0, 7), igst)
+        model.setData(model.index(0, 8), total_price)
 
     def remove_item_from_invoice(self):  # function to remove item from tree view (invoice tab)
 
