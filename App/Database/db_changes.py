@@ -150,10 +150,7 @@ class Invoice:
         date = """SELECT date FROM invoice"""
         my_cursor.execute(date)
         date = my_cursor.fetchall()
-        total_without_gst = """SELECT total_without_gst FROM invoice"""
-        my_cursor.execute(total_without_gst)
-        total_without_gst = my_cursor.fetchall()
         grand_total_with_gst = """SELECT grand_total_with_gst FROM invoice"""
         my_cursor.execute(grand_total_with_gst)
         grand_total_with_gst = my_cursor.fetchall()
-        return date, total_without_gst, grand_total_with_gst
+        return date, grand_total_with_gst

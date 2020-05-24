@@ -17,10 +17,9 @@ from PyQt5.QtGui import QStandardItemModel, QTextCursor
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
 from PyQt5 import QtGui  # for plotting graph on label
-
+import numpy as np
 
 class UserInteraction(QtWidgets.QMainWindow):
-    FROM, SUBJECT, DATE = range(3)
 
     def __init__(self, parent=None):
         super(UserInteraction, self).__init__(parent)
@@ -37,6 +36,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         # flag for invoice list to check whether the input of + button if after edit function or not
         self.edit_check_flag_invoice_list = 0
         self.dic_gst = {'cgst': 0, 'sgst': 0, 'igst': 0}
+        self.date_data, self.grand_total_with_gst = ..., ...
 
     def main_login_window_setup(self, screen):  # here we setup login window
         if screen == 'reset_window':  # hide password reset window
@@ -118,8 +118,9 @@ class UserInteraction(QtWidgets.QMainWindow):
 
         elif tab_name == 'graphs_tab':
             self.open_graphs_tab('')
-            self.retrieve_data_from_db()
             self.hover_effect('tabs_ui')
+            self.retrieve_data_from_db()
+
 
         elif tab_name == 'view_all_customer_tab':
             self.open_view_customer_tab('')
@@ -254,9 +255,11 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.tabs_ui.mmGPushButton.setShortcut("Ctrl+S")
 
         # combo box link with function
-        # self.tabs_ui.mmGComboBox.activated[str].connect(self.graph_combo_box)
+        self.tabs_ui.mmGComboBox.activated[str].connect(self.graph_combo_box)
 
-    # below are gui hover and initial setting functions
+    """
+    below are gui hover and initial setting functions
+    """
     def hover_effect(self, control):
         # adding hover effect
         if control == 'tabs_ui':
@@ -324,7 +327,34 @@ class UserInteraction(QtWidgets.QMainWindow):
             self.tabs_ui.mmInLineEdit14.setEnabled(False)
             self.tabs_ui.mmInLineEdit15.setEnabled(False)
 
-    # below are all functions of invoice tab
+    """
+    below are all functions of invoice tab
+    """
+
+    """
+        GUI Line Edit functioning
+    """
+
+    @classmethod
+    def line_edit_gui_effect(cls, line_edit, label, validation):
+        label.setStyleSheet("QLabel { color: %s}" % 'red')
+        if validation != 0:  # for mobile number
+            line_edit.textEdited.connect(lambda text: label.setStyleSheet(
+                "QLabel { color: %s}" % ('green' if len(text) == validation else 'red')))
+        else:  # check for item code, quantity and discount
+            line_edit.textEdited.connect(lambda text: label.setStyleSheet(
+                "QLabel { color: %s}" % ('green' if text else 'red')))
+
+    def setting_all_normal_gui_color_combination_invoice_tab(self):
+        self.tabs_ui.mmInLabel3.setStyleSheet("border: 0px;\n"
+                                              "color: black;")
+        self.tabs_ui.mmInLabel9.setStyleSheet("border: 0px;\n"
+                                              "color: black;")
+        self.tabs_ui.mmInLabel10.setStyleSheet("border: 0px;\n"
+                                               "color: black;")
+        self.tabs_ui.mmInLabel12.setStyleSheet("border: 0px;\n"
+                                               "color: black;")
+
     def invoice_number(self):
             self.invoice_file_object = open("../invoice_number.txt", "r")  # opening invoice file
             self.tabs_ui.mmInLabe30.setText(str(int(self.invoice_file_object.readline())))
@@ -426,9 +456,12 @@ class UserInteraction(QtWidgets.QMainWindow):
             self.tabs_ui.mmInComboBox2.nextCheckState()
         # updating invoice number
         self.invoice_number()
+        # setting color back
+        self.setting_all_normal_gui_color_combination_invoice_tab()
 
     def calculating_total_price(self):
         if self.tabs_ui.mmInLineEdit7.text() and self.tabs_ui.mmInLineEdit5 is not None:
+            self.item_details_from_db()  # to verify that other line edit are not empty and will be auto filled
             price = int(self.tabs_ui.mmInLineEdit5.text()) * int(self.tabs_ui.mmInLineEdit6.text())
             discount_price = price - (price*int(self.tabs_ui.mmInLineEdit7.text())/100)
             try:
@@ -557,6 +590,7 @@ class UserInteraction(QtWidgets.QMainWindow):
             if self.tabs_ui.mmInLineEdit4.text() != '' and self.tabs_ui.mmInLineEdit5.text() != '' and self.tabs_ui.mmInLineEdit7.text() != '':
                 self.item_details_from_db()  # to verify last time update in item code before pressing enter
                 self.calculating_total_price()  # to verify last time update in discount or quantity before adding
+                self.setting_all_normal_gui_color_combination_invoice_tab()  # to remove the red color of the label
                 if len(self.final_items_in_invoice) >= 1:
                     if self.tabs_ui.mmInLineEdit4.text() not in \
                             [self.final_items_in_invoice[i][0] for i in range(len(self.final_items_in_invoice))]:
@@ -583,11 +617,20 @@ class UserInteraction(QtWidgets.QMainWindow):
                     self.clearing_line_edit_item_invoice()
                 # add it in tree view
                 self.display_in_tree_view()
+            else:
+
+                if self.tabs_ui.mmInLineEdit4.text() == '':
+                    UserInteraction.line_edit_gui_effect(self.tabs_ui.mmInLineEdit4, self.tabs_ui.mmInLabel9, 0)
+                if self.tabs_ui.mmInLineEdit5.text() == '':
+                    UserInteraction.line_edit_gui_effect(self.tabs_ui.mmInLineEdit5, self.tabs_ui.mmInLabel10, 0)
+                if self.tabs_ui.mmInLineEdit7.text() == '':
+                    UserInteraction.line_edit_gui_effect(self.tabs_ui.mmInLineEdit7, self.tabs_ui.mmInLabel12, 0)
         else:
             self.msg.setWindowTitle("Error")
             self.msg.setText("Enter phone number to add items in bill.")
             self.msg.setIcon(QMessageBox.Warning)
             self.msg.exec_()
+            UserInteraction.line_edit_gui_effect(self.tabs_ui.mmInLineEdit1, self.tabs_ui.mmInLabel3, 10)
 
     def clearing_line_edit_item_invoice(self):
         self.tabs_ui.mmInLineEdit4.clear()
@@ -645,11 +688,14 @@ class UserInteraction(QtWidgets.QMainWindow):
                 if self.final_items_in_invoice[i][0] == self.calculating_index_at_selection():
                     t = self.final_items_in_invoice.pop(i)
                     self.display_in_tree_view()
+                    self.clearing_line_edit_item_invoice()
                     break
         except Exception as e:
             print(e)
 
-    # below are all functions related to customer db tab
+    """
+    below are all functions related to customer db tab
+    """
     def all_customers(self, event):  # displaying all customers present in customer database
         result = Customer.get_customers()
         self.tabs_ui.mmCitableWidget.setRowCount(0)
@@ -658,7 +704,9 @@ class UserInteraction(QtWidgets.QMainWindow):
             for column_number, data in enumerate(row_data):
                 self.tabs_ui.mmCitableWidget.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
 
-    # below are all functions related to item db tab
+    """
+    below are all functions related to item db tab
+    """
     def all_items(self, event):  # display all the items present in items database
         result = Items.get_items()
         self.tabs_ui.mmIitableWidget.setRowCount(0)
@@ -667,36 +715,44 @@ class UserInteraction(QtWidgets.QMainWindow):
             for column_number, data in enumerate(row_data):
                 self.tabs_ui.mmIitableWidget.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
 
-    # below are function for graph tab
-
+    """
+    below are function for graph tab
+    """
     def retrieve_data_from_db(self):
-        self.date_data, self.total_without_gst, self.grand_total_with_gst = Invoice.retrieve_invoice_data()
-        # plotting values
-        self.plot_graph(0)
-
-    def plot_graph(self, control):
+        self.date_data, self.grand_total_with_gst = Invoice.retrieve_invoice_data()
         x = []
         for i in self.date_data:
             x.append(i[0])
         self.date_data = x
-        y = []
-        for i in self.total_without_gst:
-            y.append(float(i[0]))
-        self.total_without_gst = y
-        plt.subplot(2, 1, 1)
-        plt.plot(x, y, 'o-')
+        x = []
+        for i in self.grand_total_with_gst:
+            x.append(i[0])
+        self.grand_total_with_gst = x
+
+        self.plot_graph(0)
+
+    def graph_combo_box(self):
+        return self.tabs_ui.mmGComboBox.currentText()
+
+    def plot_graph(self, control):
+
+        combo_option = self.graph_combo_box()
+
+        """
+            combo_option will return "Monthly" or "yearly" text
+            plot is to be done in this function on the basis of monthly and yearly
+            data is already retrieved from the database and is in the variables named as below
+            self.date_data = dates in the bill eg: ['2020-05-23', '2020-05-23', '2020-05-23']
+            self. grand_total_with_gst = list of total with gst g: ['481.95', '48.195', '856.8']
+        """
+
+        # Example code
+        plt.plot(self.date_data, self.grand_total_with_gst, 'o-')
         plt.gcf().autofmt_xdate()
         plt.title('Graph Representation of Sale')
         plt.ylabel('Total with GST')
-        y = []
-        for i in self.grand_total_with_gst:
-            y.append(float(i[0]))
-        self.grand_total_with_gst = y
-        plt.subplot(2, 1, 2)
-        plt.plot(x, y, '.-')
-        plt.gcf().autofmt_xdate()
         plt.xlabel('Date')
-        plt.ylabel('Total with GST')
+
         if control == 0:
             plt.savefig('graph.png', dpi=(130))
             self.tabs_ui.mmGLabel1.setPixmap(QtGui.QPixmap("graph.png"))
@@ -705,20 +761,24 @@ class UserInteraction(QtWidgets.QMainWindow):
             # deleting file
             os.remove("graph.png")
         else:
-            file_name = self.saveFileDialog()
+            self.saveFileDialog(plt)
+        
+    def saveFileDialog(self, plt):
+        save_dialog = QtWidgets.QFileDialog()
+        save_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
+        options = QFileDialog.Options()
+        file_name, _ = save_dialog.getSaveFileName(self, "Save Graph", "/home/Pictures",
+                                                            "All Files (*);;Image Files (*.png *.jpg *.bmp)", options=options)
+        if file_name:
             plt.savefig(file_name, dpi=(130))
             plt.close()
-
-    def saveFileDialog(self):
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getSaveFileName(self, "Save Graph", "",
-                                                            "All Files (*);;Image Files (*.png *.jpg *.bmp)", options=options)
-        return file_name
 
     def save_graph(self):
         self.plot_graph(1)  # to save file
 
-    # other functions by Sameer
+    """
+    other functions by Sameer
+    """
     def another_shipper(self, mob_no):
         try:
             mob_no = mob_no.strip().lower()
