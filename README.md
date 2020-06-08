@@ -48,10 +48,13 @@ variable)
     7. Modify it by writing email ID and phone number and click on 'GO'.
 5. Open App > Frontend > main_window.py and execute this file.
 6. Following screen will appear:
+
     ![image](images/img/login.PNG)
 7. Click on 'Forget Password' and change password from OTP on registered email ID or phone number.
+
     ![image](images/img/forget.PNG)
 8. Now enter your new password and you are good to go.
+    
     ![image](images/img/main.PNG)
     ![image](images/img/bil.PNG)
 ---
