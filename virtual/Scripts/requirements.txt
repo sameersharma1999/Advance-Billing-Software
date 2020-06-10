@@ -1,0 +1,17 @@
+mysql
+certifi
+chardet
+cycler
+idna
+kiwisolver
+matplotlib
+mysql-connector
+numpy
+Pillow
+pyparsing
+PyQt5
+PyQt5-sip
+python-dateutil
+requests
+six
+urllib3

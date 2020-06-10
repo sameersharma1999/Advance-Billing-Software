@@ -17,7 +17,7 @@ from PyQt5.QtGui import QStandardItemModel, QTextCursor
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
 from PyQt5 import QtGui  # for plotting graph on label
-import numpy as np
+
 
 class UserInteraction(QtWidgets.QMainWindow):
 
@@ -37,6 +37,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.edit_check_flag_invoice_list = 0
         self.dic_gst = {'cgst': 0, 'sgst': 0, 'igst': 0}
         self.date_data, self.grand_total_with_gst = ..., ...
+        self.combo_option = 'Monthly'
 
     def main_login_window_setup(self, screen):  # here we setup login window
         if screen == 'reset_window':  # hide password reset window
@@ -120,7 +121,6 @@ class UserInteraction(QtWidgets.QMainWindow):
             self.open_graphs_tab('')
             self.hover_effect('tabs_ui')
             self.retrieve_data_from_db()
-
 
         elif tab_name == 'view_all_customer_tab':
             self.open_view_customer_tab('')
@@ -732,12 +732,10 @@ class UserInteraction(QtWidgets.QMainWindow):
         self.plot_graph(0)
 
     def graph_combo_box(self):
-        return self.tabs_ui.mmGComboBox.currentText()
+        self.combo_option = self.tabs_ui.mmGComboBox.currentText()
+        self.plot_graph(0)
 
     def plot_graph(self, control):
-
-        combo_option = self.graph_combo_box()
-
         """
             combo_option will return "Monthly" or "yearly" text
             plot is to be done in this function on the basis of monthly and yearly
@@ -745,16 +743,41 @@ class UserInteraction(QtWidgets.QMainWindow):
             self.date_data = dates in the bill eg: ['2020-05-23', '2020-05-23', '2020-05-23']
             self. grand_total_with_gst = list of total with gst g: ['481.95', '48.195', '856.8']
         """
+        plt.style.use('seaborn-darkgrid')
+        if self.combo_option == 'Monthly' or self.combo_option == 'Ellipsis':
+            t_day = datetime.date.today().month
+            dates = []
+            for date, money in zip(self.date_data, self.grand_total_with_gst):
+                month = date.split('-')[1]
+                if list(month)[0] == '0':
+                    month = list(month)[1]
+                if int(month) == t_day:
+                    dates.append(date)
+            x_days = [int(list(d.split('-')[2])[1]) if(list(d.split('-')[2])[0]) == '0' else int(d.split('-')[2]) for d in dates]
+            bins = [i for i in range(1, 32)]
+            plt.hist(x_days, bins, edgecolor='black')
+            m = str(datetime.date.today().month)
+            y = str(datetime.date.today().year)
+            plt.title(f"Bill's generated in month {m} of year {y}")
+            plt.xlabel('Days')
+            plt.ylabel('Number of bills generated')
 
-        # Example code
-        plt.plot(self.date_data, self.grand_total_with_gst, 'o-')
-        plt.gcf().autofmt_xdate()
-        plt.title('Graph Representation of Sale')
-        plt.ylabel('Total with GST')
-        plt.xlabel('Date')
+        elif self.combo_option == 'Yearly':
+            year = datetime.date.today().year
+            months = []
+            for date, money in zip(self.date_data, self.grand_total_with_gst):
+                if year == int(date.split('-')[0]):
+                    month = datetime.date.today().month
+                    months.append(month)
+
+            bins = [i for i in range(1, 13)]
+            plt.hist(months, bins, edgecolor='black')
+            plt.title(f"Bill's generated of year {year}")
+            plt.xlabel('Months')
+            plt.ylabel('Number of bills generated')
 
         if control == 0:
-            plt.savefig('graph.png', dpi=(130))
+            plt.savefig('graph.png', dpi=130)
             self.tabs_ui.mmGLabel1.setPixmap(QtGui.QPixmap("graph.png"))
             self.tabs_ui.mmGLabel1.setScaledContents(True)
             plt.close()
@@ -770,7 +793,7 @@ class UserInteraction(QtWidgets.QMainWindow):
         file_name, _ = save_dialog.getSaveFileName(self, "Save Graph", "/home/Pictures",
                                                             "All Files (*);;Image Files (*.png *.jpg *.bmp)", options=options)
         if file_name:
-            plt.savefig(file_name, dpi=(130))
+            plt.savefig(file_name, dpi=130)
             plt.close()
 
     def save_graph(self):
