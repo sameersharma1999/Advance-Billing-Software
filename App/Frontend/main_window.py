@@ -450,10 +450,13 @@ class UserInteraction(QtWidgets.QMainWindow):
         # clearing tree view
         self.display_in_tree_view()
         # disabling combo boxes
-        if self.tabs_ui.mmInComboBox1.isChecked():
-            self.tabs_ui.mmInComboBox1.nextCheckState()
-        if self.tabs_ui.mmInComboBox2.isChecked():
-            self.tabs_ui.mmInComboBox2.nextCheckState()
+        self.tabs_ui.mmInComboBox1.setChecked(False)
+        self.tabs_ui.mmInComboBox2.setChecked(False)
+        #
+        # if self.tabs_ui.mmInComboBox1.isChecked():
+        #     self.tabs_ui.mmInComboBox1.nextCheckState()
+        # if self.tabs_ui.mmInComboBox2.isChecked():
+        #     self.tabs_ui.mmInComboBox2.nextCheckState()
         # updating invoice number
         self.invoice_number()
         # setting color back
@@ -597,7 +600,6 @@ class UserInteraction(QtWidgets.QMainWindow):
                         self.append_final_items_in_invoice()
                         self.setting_final_price('add', self.tabs_ui.mmInLineEdit4.text())  # used to add the values in invoice total price
                         self.clearing_line_edit_item_invoice()
-
                     else:  # if item gets matched with already existing item id of the list
                         if self.edit_check_flag_invoice_list == 1:
                             self.remove_item_from_invoice()  # removing selected item with previous values
@@ -688,7 +690,6 @@ class UserInteraction(QtWidgets.QMainWindow):
                 if self.final_items_in_invoice[i][0] == self.calculating_index_at_selection():
                     t = self.final_items_in_invoice.pop(i)
                     self.display_in_tree_view()
-                    self.clearing_line_edit_item_invoice()
                     break
         except Exception as e:
             print(e)
@@ -839,7 +840,7 @@ class UserInteraction(QtWidgets.QMainWindow):
                 self.tabs_ui.mmInLineEdit3.clear()
                 self.tabs_ui.mmInLabe28.clear()
                 self.tabs_ui.mmInLabe29.clear()
-            else:
+            if self.tabs_ui.mmInComboBox1.isChecked() and self.same_check_box is False:
                 self.same_check_box = True
                 self.tabs_ui.mmInLineEdit3.setText(data[8])
                 cus_name = data[0] + ' ' + data[1]
