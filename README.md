@@ -36,7 +36,7 @@ variable)
     ```python
     pip install -r requirements.txt
     ```
-    _**Note**: Refer to [link](https://github.com/sameersharma1999/Billing-Project) for proper understanding._
+    _**Note**: Refer to [link](https://docs.python.org/3/tutorial/venv.html) for proper understanding._
 4. Setup database file **'billing.sql'** as follows:
     1. Open XAMPP control panel and start Apache and MySQL.
     2. Click on 'Admin'.
