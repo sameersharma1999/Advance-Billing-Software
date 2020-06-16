@@ -2,8 +2,6 @@
 
 # Billing and Management System
 
-[Github Repository](https://github.com/gursimarkaur999/Billing-Project, 'Billing and Management System')
-
 ###### By Author Sameer Sharma, Gursimar Kaur
 ---
 <!-- Step-2 Evaluate the project -->
