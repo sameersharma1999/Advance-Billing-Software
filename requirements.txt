@@ -7,7 +7,7 @@ kiwisolver==1.2.0
 matplotlib==3.2.1
 mysql-connector==2.2.9
 numpy==1.18.4
-Pillow==7.1.2
+Pillow==8.3.2
 pyparsing==2.4.7
 PyQt5==5.14.2
 PyQt5-sip==12.7.2
